@@ -1,0 +1,257 @@
+{
+  "name": "Simple Appointment Booking System",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "book-appointment",
+        "options": {}
+      },
+      "id": "6fb9604f-475c-4036-8af2-240f07bb0d78",
+      "name": "Booking Form (Webhook)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -976,
+        -128
+      ],
+      "webhookId": "book-appointment-endpoint"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "aa000000-0000-4000-8000-000000000001",
+              "name": "customerName",
+              "value": "={{ $json.body.name }}",
+              "type": "string"
+            },
+            {
+              "id": "aa000000-0000-4000-8000-000000000002",
+              "name": "customerEmail",
+              "value": "={{ $json.body.email }}",
+              "type": "string"
+            },
+            {
+              "id": "aa000000-0000-4000-8000-000000000003",
+              "name": "requestedStart",
+              "value": "={{ $json.body.startTime }}",
+              "type": "string"
+            },
+            {
+              "id": "aa000000-0000-4000-8000-000000000004",
+              "name": "requestedEnd",
+              "value": "={{ $json.body.endTime }}",
+              "type": "string"
+            },
+            {
+              "id": "aa000000-0000-4000-8000-000000000005",
+              "name": "serviceType",
+              "value": "={{ $json.body.service }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b4312156-cad0-4b0a-a8be-19e3e4625547",
+      "name": "Extract Booking Details",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -800,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "value": "PUT_YOUR_GOOGLE_CALENDAR_ID_HERE",
+          "mode": "id"
+        },
+        "timeMin": "={{ $json.requestedStart }}",
+        "timeMax": "={{ $json.requestedEnd }}",
+        "options": {}
+      },
+      "id": "2dcb456a-1bcd-4468-9af0-9e1bb246c41e",
+      "name": "Check Calendar for Conflicts",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        -592,
+        -48
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cc000000-0000-4000-8000-000000000001",
+              "leftValue": "={{ $items(\"Check Calendar for Conflicts\").length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "33bdde5d-6de3-4955-8e4f-5294fd49209d",
+      "name": "Is Time Slot Free?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -336,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "calendar": {
+          "__rl": true,
+          "value": "PUT_YOUR_GOOGLE_CALENDAR_ID_HERE",
+          "mode": "id"
+        },
+        "start": "={{ $('Extract Booking Details').item.json.requestedStart }}",
+        "end": "={{ $('Extract Booking Details').item.json.requestedEnd }}",
+        "additionalFields": {
+          "description": "Booked automatically. Customer email: {{ $('Extract Booking Details').item.json.customerEmail }}",
+          "summary": "={{ $('Extract Booking Details').item.json.serviceType }} - {{ $('Extract Booking Details').item.json.customerName }}"
+        }
+      },
+      "id": "b77c621b-a5cf-4c98-8d0e-37a10831e60b",
+      "name": "Create Calendar Event",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        -96,
+        -112
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Extract Booking Details').item.json.customerEmail }}",
+        "subject": "Your appointment is confirmed!",
+        "message": "Hi {{ $('Extract Booking Details').item.json.customerName }},\n\nYour appointment for \"{{ $('Extract Booking Details').item.json.serviceType }}\" is confirmed for:\n{{ $('Extract Booking Details').item.json.requestedStart }} - {{ $('Extract Booking Details').item.json.requestedEnd }}\n\nSee you then!",
+        "options": {}
+      },
+      "id": "c587c705-fa50-4c82-91dd-b829caada9c5",
+      "name": "Send Confirmation Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        192,
+        -64
+      ],
+      "webhookId": "a7123a6d-e645-4eea-be52-62047da2a236"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Extract Booking Details').item.json.customerEmail }}",
+        "subject": "Sorry, that time slot is not available",
+        "message": "Hi {{ $('Extract Booking Details').item.json.customerName }},\n\nUnfortunately the time slot you requested ({{ $('Extract Booking Details').item.json.requestedStart }} - {{ $('Extract Booking Details').item.json.requestedEnd }}) is already booked.\n\nPlease choose a different time and submit the form again.\n\nSorry for the inconvenience!",
+        "options": {}
+      },
+      "id": "a1f55817-1529-48a2-b286-e11878f67868",
+      "name": "Send Rejection Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        176,
+        256
+      ],
+      "webhookId": "8e0eafcd-00ee-4748-89e6-6f4ac66a4c5d"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Booking Form (Webhook)": {
+      "main": [
+        [
+          {
+            "node": "Extract Booking Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Booking Details": {
+      "main": [
+        [
+          {
+            "node": "Check Calendar for Conflicts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Calendar for Conflicts": {
+      "main": [
+        [
+          {
+            "node": "Is Time Slot Free?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Time Slot Free?": {
+      "main": [
+        [
+          {
+            "node": "Create Calendar Event",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Rejection Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Calendar Event": {
+      "main": [
+        [
+          {
+            "node": "Send Confirmation Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "f5df5d34-8def-4aa6-a0bf-49d8095398fb",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d81e001e9d59947a771f174989353dc32d72525ea939391fa8cdf98b8208fb81"
+  },
+  "nodeGroups": [],
+  "id": "USk0Lj7EFjrjgxuQ",
+  "tags": []
+}
